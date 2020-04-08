@@ -40,28 +40,17 @@ foreach ($sfunctionapp in $sfunctionAppNames)
             $properties = $sresource.Properties;
 
             #remove all Azure generated settings
-            $properties.PSObject.properties.remove("AzureWebJobsStorage");
-            $properties.PSObject.properties.remove("APPINSIGHTS_INSTRUMENTATIONKEY");
-            $properties.PSObject.properties.remove("AzureWebJobsDashboard");
-            $properties.PSObject.properties.remove("FUNCTIONS_EXTENSION_VERSION");
-            $properties.PSObject.properties.remove("FUNCTIONS_WORKER_RUNTIME");
-            $properties.PSObject.properties.remove("WEBSITE_CONTENTAZUREFILECONNECTIONSTRING");
-            $properties.PSObject.properties.remove("WEBSITE_CONTENTSHARE");
-            $properties.PSObject.properties.remove("WEBSITE_ENABLE_SYNC_UPDATE_SITE");
-            $properties.PSObject.properties.remove("WEBSITE_RUN_FROM_PACKAGE");
-            $properties.PSObject.properties.remove("APPLICATIONINSIGHTS_CONNECTIONSTRING");
-            $properties.PSObject.properties.remove("AZURE_FUNCTIONS_ENVIRONMENT");
-            $properties.PSObject.properties.remove("AzureWebJobsDisableHomepage");
-            $properties.PSObject.properties.remove("AzureWebJobsFeatureFlags");
-            $properties.PSObject.properties.remove("AzureWebJobsSecretStorageType");
-            $properties.PSObject.properties.remove("AzureWebJobs_TypeScriptPath");
-            $properties.PSObject.properties.remove("FUNCTION_APP_EDIT_MODE");
-            $properties.PSObject.properties.remove("FUNCTIONS_V2_COMPATIBILITY_MODE");
-            $properties.PSObject.properties.remove("FUNCTIONS_WORKER_PROCESS_COUNT");
-            $properties.PSObject.properties.remove("WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT");
-            $properties.PSObject.properties.remove("WEBSITE_NODE_DEFAULT_VERSION");
-            $properties.PSObject.properties.remove("AZURE_FUNCTION_PROXY_DISABLE_LOCAL_CALL");
-            $properties.PSObject.properties.remove("AZURE_FUNCTION_PROXY_BACKEND_URL_DECODE_SLASHES");
+            $propertiesToRemove = @("AzureWebJobsStorage", "APPINSIGHTS_INSTRUMENTATIONKEY", "AzureWebJobsDashboard", "FUNCTIONS_EXTENSION_VERSION", `
+            "FUNCTIONS_WORKER_RUNTIME", "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", "WEBSITE_CONTENTSHARE", "WEBSITE_CONTENTSHARE", "WEBSITE_CONTENTSHARE", `
+            "WEBSITE_ENABLE_SYNC_UPDATE_SITE", "WEBSITE_RUN_FROM_PACKAGE", "APPLICATIONINSIGHTS_CONNECTIONSTRING", "AZURE_FUNCTIONS_ENVIRONMENT", "AzureWebJobsDisableHomepage", `
+            "AzureWebJobsFeatureFlags", "AzureWebJobsSecretStorageType", "AzureWebJobs_TypeScriptPath", "FUNCTION_APP_EDIT_MODE", "FUNCTIONS_V2_COMPATIBILITY_MODE", `
+            "FUNCTIONS_WORKER_PROCESS_COUNT", "WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT", "WEBSITE_NODE_DEFAULT_VERSION", "AZURE_FUNCTION_PROXY_DISABLE_LOCAL_CALL", `
+            "AZURE_FUNCTION_PROXY_BACKEND_URL_DECODE_SLASHES")
+            
+            foreach ($rProperty in $propertiesToRemove)
+            {
+                $properties.PSObject.properties.remove($rProperty);
+            }
             
             #get the destination function app appsettings
             $dresource = Invoke-AzResourceAction -ResourceGroupName $destRG -ResourceType Microsoft.Web/sites/config -ResourceName "$($dfunctionapp)/appsettings" -Action list -ApiVersion 2016-08-01 -Force
