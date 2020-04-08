@@ -8,6 +8,8 @@ In the event that you have to copy app settings from one Azure Function to anoth
 
 The first iteration of this Github project takes all appsettings in an Azure Function in a resource group with the Function App Name taking the form of: *"MyFunctionName-othertext"* and copies them to existing azure functions of the same form in a different resource group, given that the *"othertext"* is unknown in both of them, and it has a *"-"* separation in the name. 
 
+To use this script you either need the Azure CLI which can be found [here](https://github.com/Azure/azure-cli/releases), or you can use the cloud shell in your Azure Portal, which automatically had the Azure CLI installed.
+
 A few quick comments if you want to change anything in the code for yourself:
 ```
 21: $functionStart = $sfunctionapp.SubString(0, $sfunctionapp.IndexOf("-") -1);
