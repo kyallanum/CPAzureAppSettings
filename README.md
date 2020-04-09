@@ -3,7 +3,7 @@
 ```
 "Usage: "
 ./CPAzureFunctionAppSettings -(single|multiple)
-./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`"
+./CPAzureFunctionAppSettings -multiple [-separator "<separator>"] -subID "<subscriptionid>" -sourceRg "<source_resource_group>" -destRG "<destination_resource_group>"
 ./CPAzureFunctionAppSettings -single <--------- not implemented yet
 ```
 
@@ -19,4 +19,4 @@ The propertiesToRemove variable in the remove-Properties functions specifies all
 
 --------------
 
-At this point this is all that I have implemented. But I will be working to implement other features into this script to allow other forms of copying including just copying a single function apps appsettings, as well as copying across subscriptions.
+At this point this is all that I have implemented. But I will be working to implement other features into this script to allow other forms of copying including just copying a single function apps appsettings.
