@@ -1,10 +1,12 @@
-﻿param(
+﻿#Parameters to get when calling script
+param(
     [string]$subID = "",
     [string]$sourceRG = "",
     [string]$destRG = "",
     [string]$separator = "-"
 )
 
+#If the user needs help with syntax show them here
 if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
 {
     echo "Usage: "
@@ -15,6 +17,7 @@ if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
     exit 1
 }
 
+#Require that the user specify whether they want to copy a singular function app, or multiple.
 if ($args[0] -ne "-single" -and $args[0] -ne "-multiple")
 {
     echo "Usage: "
@@ -25,6 +28,7 @@ if ($args[0] -ne "-single" -and $args[0] -ne "-multiple")
     exit 1
 }
 
+#If any required information is missing, get that from the user.
 if ($subID -eq "")
 {
     $subID = Read-Host -Prompt "Subscription ID"
@@ -38,23 +42,35 @@ if ($destRG -eq "")
     $destRG = Read-Host -Prompt "Destination Resource Group Name"
 }
 
+#Function: set-Subscription
+#Purpose: Sets the Subscription that we are going to be working with
+#Takes Variables: $subscriptionID [string]
+#Returns: Nothing
 Function set-Subscription
 {
     param([string]$subscriptionID)
     az account set --subscription $subscriptionID
 }
 
+#Function: get-MultipleFunctionAppNames
+#Purpose: Gets the name of multiple function apps in a resource group and returns it in an array.
+#Takes Variables: $resourceGroupName [string]
+#Returns: $functionAppNames [array]
 Function get-MultipleFunctionAppNames
 {
     param([string]$resourceGroupName)
     
     
     #Get the source Function App Names
-    $functionappIDs = @($(az functionapp list -g $resourceGroupName --query "[?state=='Running'].{ID: id}" | ConvertFrom-Json).ID)
+    $functionappIDs = @($(az functionapp list -g $resourceGroupName --query "[].{ID: id}" | ConvertFrom-Json).ID)
     $functionAppNames = @(foreach ($item in $functionAppIDs) {$item.Split("/")[-1];})
     , $functionAppNames
 }
 
+#Function: get-FunctionAppSettings
+#Purpose: Takes a resource group name and a function app name, and gets its settings. Returns it as a Custom Powershell Object.
+#Takes Variables: $resourceGroupName [string], $functionAppName [string]
+#Returns: $functionapp [PSCustomObject]
 Function get-FunctionAppSettings
 {
     param( [string]$resourceGroupName,
@@ -64,6 +80,10 @@ Function get-FunctionAppSettings
     return [PSCustomObject]$functionapp
 }
 
+#Function: remove-Properties
+#Purpose: Takes a Powershell Custom Object and removes all Azure Generated Settings, ensuring the Function Apps behavior does not change. Returns a Custom Powershell Object.
+#Takes Variables: $properties [PSCustomObject]
+#Returns: $properties [PSCustomObject]
 Function remove-Properties
 {
     param([PsCustomObject]$properties)
@@ -83,6 +103,10 @@ Function remove-Properties
     return [PSCustomObject]$properties
 }
 
+#Function: add-PropertiesToFunctionApp
+#Purpose: Adds properties from one Powershell Custom Object to another by converting the first into a Hash Table, and then adding each key and value to the end of the other. Returns a Powershell Custom Object.
+#Takes Variables: $destFunction [PSCustomObject], $propertiestoAdd [PSCustomObject]
+#Returns: $destFunction [PSCustomObject]
 Function add-PropertiesToFunctionApp
 {
     param( [PSCustomObject]$destFunction,
@@ -97,6 +121,10 @@ Function add-PropertiesToFunctionApp
     return [PSCustomObject]$destFunction
 }
 
+#Function: update-FunctionAppSettings
+#Purpose: Updates a function app settings by taking a Custom Powershell Object, the Destination Resource Group, and the Function App Name, and putting the appsettings in there.
+#Takes Variables: $destinationRG [string], $functionAppName[string], $updatedSettings [PSCustomObject]
+#Returns: [PSCustomObject]
 Function update-FunctionAppSettings
 {
     param(  [string]$destinationRG,
@@ -106,7 +134,11 @@ Function update-FunctionAppSettings
     return New-AzResource -PropertyObject $updatedSettings -ResourceGroupName $destinationRG -ResourceType Microsoft.Web/sites/config -ResourceName "$($functionAppName)/appsettings" -ApiVersion 2016-08-01 -Force
 }
             
-
+#Function: copy-MultipleFunctionAppsWithSeparator
+#Purpose: Takes multiple resource groups and takes all Azure Functions App Settings and copies them to Azure Functions in a different resource group as long as they have the same prefix. 
+#         Prefix is, by default denoted by "-" or the $separator variable.
+#Takes Variables: $sep [string], $sfunctionAppNames [string[]], $dfunctionAppNames [string[]], $sourceResourceGroup [string], $destinationResourceGroup [string]
+#Returns: Nothing
 Function copy-MultipleFunctionAppsWithSeparator
 {
     param(  [string]$sep = $separator,
@@ -149,11 +181,12 @@ Function copy-MultipleFunctionAppsWithSeparator
     }
 }
 
-## Function App Setting Copy Start
+# Function App Setting Copy Start
 echo "-------------------------------"
 echo "Setting Subscription: $($subID)"
 set-Subscription -subscriptionID $subID;
 
+#If the -multiple tag is specified, copy multiple function apps.
 if($args[0] -eq "-multiple")
 {
     echo "Copying Multiple Function Apps appsettings."
@@ -163,8 +196,9 @@ if($args[0] -eq "-multiple")
     $destFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $destRG;
     echo "Destination Function App Names: $($destFunctionAppNames)"
 
-    $appsettings = copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames -sourceResourceGroup $sourceRG -destinationResourceGroup $destRG
+    copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames -sourceResourceGroup $sourceRG -destinationResourceGroup $destRG
 }
+#we haven't implemented this yet
 elseif($args[0] -eq "-single")
 {
     echo "Currently copying one single function has not been implemented yet."
