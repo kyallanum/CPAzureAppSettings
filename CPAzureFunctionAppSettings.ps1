@@ -1,71 +1,154 @@
 ﻿param(
     [string]$subID = "",
     [string]$sourceRG = "",
-    [string]$destRG = ""
+    [string]$destRG = "",
+    [string]$separator = "-"
 )
 
-if ($subID -eq "" -or $sourceRG -eq "" -or $destRG -eq "")
+if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
 {
     echo "Usage: "
-    echo "./CPAzureFunctionAppSettings -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -single/-multiple -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
     echo "`n"
     exit 1
 }
 
-
-az account set --subscription $subID
-
-#Get the source Function App Names
-$sfunctionappIDs = @($(az functionapp list -g $sourceRG --query "[?state=='Running'].{ID: id}" | ConvertFrom-Json).ID)
-$sfunctionAppNames = @(foreach ($item in $sfunctionAppIDs) {$item.Split("/")[-1];})
-
-#Get the destination Function App Names
-$dfunctionappIDs = @($(az functionapp list -g $destRG --query "[?state=='Running'].{ID: id}" | ConvertFrom-Json).ID)
-$dfunctionAppNames = @(foreach ($item in $dfunctionAppIDs) {$item.Split("/")[-1];})
-
-#Loop through each source function app
-foreach ($sfunctionapp in $sfunctionAppNames)
+if ($args[0] -ne "-single" -and $args[0] -ne "-multiple")
 {
-    #and through each destination app
-    foreach ($dfunctionapp in $dfunctionAppNames)
+    echo "Usage: "
+    echo "./CPAzureFunctionAppSettings -single/-multiple -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "`n"
+    exit 1
+}
+
+if ($subID -eq "")
+{
+    $subID = Read-Host -Prompt "Subscription ID"
+}
+if ($sourceRG -eq "")
+{
+    $sourceRG = Read-Host -Prompt "Source Resource Group Name"
+}
+if ($destRG -eq "")
+{
+    $destRG = Read-Host -Prompt "Destination Resource Group Name"
+}
+
+Function set-Subscription
+{
+    param([string]$subscriptionID)
+    az account set --subscription $subscriptionID
+}
+
+Function get-MultipleFunctionAppNames
+{
+    param([string]$resourceGroupName)
+    
+    #Get the source Function App Names
+    $functionappIDs = @($(az functionapp list -g $resourceGroupName --query "[?state=='Running'].{ID: id}" | ConvertFrom-Json).ID)
+    $functionAppNames = @(foreach ($item in $sfunctionAppIDs) {$item.Split("/")[-1];})
+    , $functionAppNames
+}
+
+Function get-FunctionAppSettings
+{
+    param( [string]$resourceGroupName,
+           [string]$functionAppName)
+
+    $functionapp = Invoke-AzResourceAction -ResourceGroupName $resourceGroupName -ResourceType Microsoft.Web/sites/config -ResourceName "$($functionAppName)/appsettings" -Action list -ApiVersion 2016-08-01 -Force
+    return [PSCustomObject]$functionapp
+}
+
+Function remove-Properties
+{
+    param([PsCustomObject]$properties)
+
+    $propertiesToRemove = @("AzureWebJobsStorage", "APPINSIGHTS_INSTRUMENTATIONKEY", "AzureWebJobsDashboard", "FUNCTIONS_EXTENSION_VERSION", `
+    "FUNCTIONS_WORKER_RUNTIME", "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", "WEBSITE_CONTENTSHARE", "WEBSITE_CONTENTSHARE", "WEBSITE_CONTENTSHARE", `
+    "WEBSITE_ENABLE_SYNC_UPDATE_SITE", "WEBSITE_RUN_FROM_PACKAGE", "APPLICATIONINSIGHTS_CONNECTIONSTRING", "AZURE_FUNCTIONS_ENVIRONMENT", "AzureWebJobsDisableHomepage", `
+    "AzureWebJobsFeatureFlags", "AzureWebJobsSecretStorageType", "AzureWebJobs_TypeScriptPath", "FUNCTION_APP_EDIT_MODE", "FUNCTIONS_V2_COMPATIBILITY_MODE", `
+    "FUNCTIONS_WORKER_PROCESS_COUNT", "WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT", "WEBSITE_NODE_DEFAULT_VERSION", "AZURE_FUNCTION_PROXY_DISABLE_LOCAL_CALL", `
+    "AZURE_FUNCTION_PROXY_BACKEND_URL_DECODE_SLASHES")
+            
+    foreach ($rProperty in $propertiesToRemove)
     {
-        #get what the function starts with so we can identify what destination app to send the settings
-        $functionStart = $sfunctionapp.SubString(0, $sfunctionapp.IndexOf("-") -1);
+        $properties.PSObject.properties.remove($rProperty);
+    }
 
-        #find the matching destination function app
-        if($dfunctionapp -like "$($functionStart)*")
+    return [PSCustomObject]$properties
+}
+
+Function add-PropertiesToFunctionApp
+{
+    param( [PSCustomObject]$destFunction,
+           [PSCustomObject]$propertiestoAdd )
+           
+    $propertiestoAdd = $propertiestoAdd | ConvertTo-Json | ConvertFrom-Json -AsHashTable 
+    foreach ($p in $propertiestoAdd.keys)
+    {
+        $destFunction.Properties | Add-Member -MemberType NoteProperty -Name $p -Value $propertiestoAdd.$p -Force
+    }
+
+    return [PSCustomObject]$destFunction
+}
+
+Function update-FunctionAppSettings
+{
+    param(  [string]$destinationRG,
+            [string]$functionAppName,
+            [PSCustomObject]$updatedSettings )
+    
+    return New-AzResource -PropertyObject $updatedSettings -ResourceGroupName $destinationRG -ResourceType Microsoft.Web/sites/config -ResourceName "$($functionAppName)/appsettings" -ApiVersion 2016-08-01 -Force
+}
+            
+
+Function copy-MultipleFunctionAppsWithSeparator
+{
+    param(  [string]$separator,
+            [string[]]$sfunctionAppNames,
+            [string[]]$dfunctionAppNames,
+            [string]$sourceResourceGroup,
+            [string]$destinationResourceGroup )
+
+    #Loop through each source function app
+    foreach ($sfunctionapp in $sfunctionAppNames)
+    {
+        #and through each destination app
+        foreach ($dfunctionapp in $dfunctionAppNames)
         {
-            #get the source function app settings
-            $sresource = Invoke-AzResourceAction -ResourceGroupName $sourceRG -ResourceType Microsoft.Web/sites/config -ResourceName "$($sfunctionapp)/appsettings" -Action list -ApiVersion 2016-08-01 -Force
-            $properties = $sresource.Properties;
+            #get what the function starts with so we can identify what destination app to send the settings
+            $functionStart = $sfunctionapp.SubString(0, $sfunctionapp.IndexOf($separator) -1);
 
-            #remove all Azure generated settings
-            $propertiesToRemove = @("AzureWebJobsStorage", "APPINSIGHTS_INSTRUMENTATIONKEY", "AzureWebJobsDashboard", "FUNCTIONS_EXTENSION_VERSION", `
-            "FUNCTIONS_WORKER_RUNTIME", "WEBSITE_CONTENTAZUREFILECONNECTIONSTRING", "WEBSITE_CONTENTSHARE", "WEBSITE_CONTENTSHARE", "WEBSITE_CONTENTSHARE", `
-            "WEBSITE_ENABLE_SYNC_UPDATE_SITE", "WEBSITE_RUN_FROM_PACKAGE", "APPLICATIONINSIGHTS_CONNECTIONSTRING", "AZURE_FUNCTIONS_ENVIRONMENT", "AzureWebJobsDisableHomepage", `
-            "AzureWebJobsFeatureFlags", "AzureWebJobsSecretStorageType", "AzureWebJobs_TypeScriptPath", "FUNCTION_APP_EDIT_MODE", "FUNCTIONS_V2_COMPATIBILITY_MODE", `
-            "FUNCTIONS_WORKER_PROCESS_COUNT", "WEBSITE_MAX_DYNAMIC_APPLICATION_SCALE_OUT", "WEBSITE_NODE_DEFAULT_VERSION", "AZURE_FUNCTION_PROXY_DISABLE_LOCAL_CALL", `
-            "AZURE_FUNCTION_PROXY_BACKEND_URL_DECODE_SLASHES")
-            
-            foreach ($rProperty in $propertiesToRemove)
+            #find the matching destination function app
+            if($dfunctionapp -like "$($functionStart)*")
             {
-                $properties.PSObject.properties.remove($rProperty);
-            }
-            
-            #get the destination function app appsettings
-            $dresource = Invoke-AzResourceAction -ResourceGroupName $destRG -ResourceType Microsoft.Web/sites/config -ResourceName "$($dfunctionapp)/appsettings" -Action list -ApiVersion 2016-08-01 -Force
-            
-            #convert the remianing appsettings to a hashtable so we can insert it into destinations appsettings
-            $properties = $properties | ConvertTo-Json | ConvertFrom-Json -AsHashTable
-            
-            #loop through the hash table and insert each key/value appropriately
-            foreach ($p in $properties.keys)
-            {
-                $dresource.Properties | Add-Member -MemberType NoteProperty -Name $p -Value $properties.$p -Force
-            }
+                #get the source function app settings
+                $sresource = get-FunctionAppSettings -resourceGroupName $sourceResourceGroup -functionAppName $sfunctionapp
+                $properties = $sresource.Properties;
 
-            #insert all of the appsettings into the destination function
-            New-AzResource -PropertyObject $dresource.Properties -ResourceGroupName $destRG -ResourceType Microsoft.Web/sites/config -ResourceName "$($dfunctionapp)/appsettings" -ApiVersion 2016-08-01 -Force
+                #remove all Azure generated settings
+                $properties = remove-Properties -properties $properties
+            
+                #get the destination function app appsettings
+                $dresource = get-FunctionAppSettings -resourceGroupName $destinationResourceGroup -functionAppName $dfunctionapp
+            
+                $dresource = add-PropertiesToFunctionApp -destFunction $dresource -propertiestoAdd $properties
+
+                #insert all of the appsettings into the destination function
+                update-FunctionAppSettings -destinationRG $destRG -functionAppName $dfunctionapp -updatedSettings $dresource.Properties
+            }
         }
     }
+}
+
+## Function App Start
+
+set-Subscription -subscriptionID $subID;
+
+if(args[0] -eq "-multiple")
+{
+    $sourceFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $sourceRG;
+    $destFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $destRG;
+
+    $appsettings = copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames
 }
