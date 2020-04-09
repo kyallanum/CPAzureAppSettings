@@ -8,7 +8,9 @@
 if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
 {
     echo "Usage: "
-    echo "./CPAzureFunctionAppSettings -single/-multiple -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -(single|multiple)"
+    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
     echo "`n"
     exit 1
 }
@@ -16,7 +18,9 @@ if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
 if ($args[0] -ne "-single" -and $args[0] -ne "-multiple")
 {
     echo "Usage: "
-    echo "./CPAzureFunctionAppSettings -single/-multiple -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -(single|multiple)"
+    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
     echo "`n"
     exit 1
 }
@@ -151,4 +155,14 @@ if(args[0] -eq "-multiple")
     $destFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $destRG;
 
     $appsettings = copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames
+}
+else if(args[0] -eq "-single")
+{
+    echo "Currently copying one single function has not been implemented yet."
+    echo "Usage: "
+    echo "./CPAzureFunctionAppSettings -(single|multiple)"
+    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
+    echo "`n"
+    exit 1
 }
