@@ -19,4 +19,4 @@ The propertiesToRemove variable in the remove-Properties functions specifies all
 
 --------------
 
-At this point this is all that I have implemented. But I will be working to implement other features into this script to allow other forms of copying including just copying a single function apps appsettings.
+At this point this is all that I have implemented. But I will be working to implement other features into this script to allow other forms of copying including just copying a single function apps appsettings, as well as copying across subscriptions.

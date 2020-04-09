@@ -48,9 +48,10 @@ Function get-MultipleFunctionAppNames
 {
     param([string]$resourceGroupName)
     
+    
     #Get the source Function App Names
     $functionappIDs = @($(az functionapp list -g $resourceGroupName --query "[?state=='Running'].{ID: id}" | ConvertFrom-Json).ID)
-    $functionAppNames = @(foreach ($item in $sfunctionAppIDs) {$item.Split("/")[-1];})
+    $functionAppNames = @(foreach ($item in $functionAppIDs) {$item.Split("/")[-1];})
     , $functionAppNames
 }
 
@@ -108,11 +109,12 @@ Function update-FunctionAppSettings
 
 Function copy-MultipleFunctionAppsWithSeparator
 {
-    param(  [string]$separator,
+    param(  [string]$sep = $separator,
             [string[]]$sfunctionAppNames,
             [string[]]$dfunctionAppNames,
             [string]$sourceResourceGroup,
             [string]$destinationResourceGroup )
+
 
     #Loop through each source function app
     foreach ($sfunctionapp in $sfunctionAppNames)
@@ -121,14 +123,16 @@ Function copy-MultipleFunctionAppsWithSeparator
         foreach ($dfunctionapp in $dfunctionAppNames)
         {
             #get what the function starts with so we can identify what destination app to send the settings
-            $functionStart = $sfunctionapp.SubString(0, $sfunctionapp.IndexOf($separator) -1);
+            $functionStart = $sfunctionapp.SubString(0, $sfunctionapp.IndexOf($sep));
 
             #find the matching destination function app
             if($dfunctionapp -like "$($functionStart)*")
             {
+                Write-Host "$($dfunctionapp) matches $($functionStart)"
                 #get the source function app settings
                 $sresource = get-FunctionAppSettings -resourceGroupName $sourceResourceGroup -functionAppName $sfunctionapp
                 $properties = $sresource.Properties;
+                Write-Host $properties
 
                 #remove all Azure generated settings
                 $properties = remove-Properties -properties $properties
@@ -146,17 +150,22 @@ Function copy-MultipleFunctionAppsWithSeparator
 }
 
 ## Function App Start
-
+echo "-------------------------------"
+echo "Setting Subscription: $($subID)"
 set-Subscription -subscriptionID $subID;
 
-if(args[0] -eq "-multiple")
+if($args[0] -eq "-multiple")
 {
+    echo "Copying Multiple Function Apps appsettings."
+    echo "Source: $($sourceRG)"
     $sourceFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $sourceRG;
+    echo "Source Function App Names: $($sourceFunctionAppNames)"
     $destFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $destRG;
+    echo "Destination Function App Names: $($destFunctionAppNames)"
 
-    $appsettings = copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames
+    $appsettings = copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames -sourceResourceGroup $sourceRG -destinationResourceGroup $destRG
 }
-else if(args[0] -eq "-single")
+elseif($args[0] -eq "-single")
 {
     echo "Currently copying one single function has not been implemented yet."
     echo "Usage: "
