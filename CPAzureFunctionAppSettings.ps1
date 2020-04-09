@@ -149,7 +149,7 @@ Function copy-MultipleFunctionAppsWithSeparator
     }
 }
 
-## Function App Start
+## Function App Setting Copy Start
 echo "-------------------------------"
 echo "Setting Subscription: $($subID)"
 set-Subscription -subscriptionID $subID;
