@@ -1,6 +1,7 @@
 ﻿#Parameters to get when calling script
 param(
     [string]$subID = "",
+    [string]$destSubId = "",
     [string]$sourceRG = "",
     [string]$destRG = "",
     [string]$separator = "-"
@@ -9,9 +10,10 @@ param(
 #If the user needs help with syntax show them here
 if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
 {
+
     echo "Usage: "
     echo "./CPAzureFunctionAppSettings -(single|multiple)"
-    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" [-destSubID `"<destination_subscription_id>`"] -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
     echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
     echo "`n"
     exit 1
@@ -22,7 +24,7 @@ if ($args[0] -ne "-single" -and $args[0] -ne "-multiple")
 {
     echo "Usage: "
     echo "./CPAzureFunctionAppSettings -(single|multiple)"
-    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" [-destSubID `"<destination_subscription_id>`"] -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
     echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
     echo "`n"
     exit 1
@@ -60,7 +62,6 @@ Function get-MultipleFunctionAppNames
 {
     param([string]$resourceGroupName)
     
-    
     #Get the source Function App Names
     $functionappIDs = @($(az functionapp list -g $resourceGroupName --query "[].{ID: id}" | ConvertFrom-Json).ID)
     $functionAppNames = @(foreach ($item in $functionAppIDs) {$item.Split("/")[-1];})
@@ -76,7 +77,11 @@ Function get-FunctionAppSettings
     param( [string]$resourceGroupName,
            [string]$functionAppName)
 
-    $functionapp = Invoke-AzResourceAction -ResourceGroupName $resourceGroupName -ResourceType Microsoft.Web/sites/config -ResourceName "$($functionAppName)/appsettings" -Action list -ApiVersion 2016-08-01 -Force
+    $functionapp = $(az functionapp config appsettings list --name $functionAppName --resource-group $resourceGroupName | ConvertFrom-Json)
+    $functionapp | ForEach { $_.PSObject.Properties.Remove('slotSetting') }
+    $myObject = [PSCustomObject]@{}
+    foreach($property in $functionapp) { $myObject | Add-Member -MemberType NoteProperty -Name $property.Name -Value $property.Value }
+    $functionapp = $myObject
     return [PSCustomObject]$functionapp
 }
 
@@ -115,7 +120,7 @@ Function add-PropertiesToFunctionApp
     $propertiestoAdd = $propertiestoAdd | ConvertTo-Json | ConvertFrom-Json -AsHashTable 
     foreach ($p in $propertiestoAdd.keys)
     {
-        $destFunction.Properties | Add-Member -MemberType NoteProperty -Name $p -Value $propertiestoAdd.$p -Force
+        $destFunction | Add-Member -MemberType NoteProperty -Name $p -Value $propertiestoAdd.$p -Force
     }
 
     return [PSCustomObject]$destFunction
@@ -131,7 +136,13 @@ Function update-FunctionAppSettings
             [string]$functionAppName,
             [PSCustomObject]$updatedSettings )
     
-    return New-AzResource -PropertyObject $updatedSettings -ResourceGroupName $destinationRG -ResourceType Microsoft.Web/sites/config -ResourceName "$($functionAppName)/appsettings" -ApiVersion 2016-08-01 -Force
+    $settingsarray = @()
+    for($i=0; $i -lt $updatedSettings.PSObject.Properties.Name.length; $i++)
+    {
+	    $settingsarray += $("`"" + $updatedSettings.PSObject.properties.name[$i] + "=" + $updatedSettings.PSObject.properties.value[$i] + "`"");
+    }
+    az functionapp config appsettings set --name $functionAppName --resource-group $destinationRG --settings $(foreach($setting in $settingsarray) { $setting }) | Out-Null
+
 }
             
 #Function: copy-MultipleFunctionAppsWithSeparator
@@ -151,31 +162,37 @@ Function copy-MultipleFunctionAppsWithSeparator
     #Loop through each source function app
     foreach ($sfunctionapp in $sfunctionAppNames)
     {
-        #and through each destination app
+        #get the source function app settings
+        $sproperties = get-FunctionAppSettings -resourceGroupName $sourceResourceGroup -functionAppName $sfunctionapp
+        
+        #get what the function starts with so we can identify what destination app to send the settings
+        $functionStart = $sfunctionapp.SubString(0, $sfunctionapp.IndexOf($sep));
+
+        #remove all Azure generated settings
+        $sproperties = remove-Properties -properties $sproperties
+
+        #and loop through each destination app
         foreach ($dfunctionapp in $dfunctionAppNames)
         {
-            #get what the function starts with so we can identify what destination app to send the settings
-            $functionStart = $sfunctionapp.SubString(0, $sfunctionapp.IndexOf($sep));
 
             #find the matching destination function app
             if($dfunctionapp -like "$($functionStart)*")
-            {
-                Write-Host "$($dfunctionapp) matches $($functionStart)"
-                #get the source function app settings
-                $sresource = get-FunctionAppSettings -resourceGroupName $sourceResourceGroup -functionAppName $sfunctionapp
-                $properties = $sresource.Properties;
-                Write-Host $properties
-
-                #remove all Azure generated settings
-                $properties = remove-Properties -properties $properties
-            
+            {            
+                if($destSubId -ne "")
+                {
+                    set-Subscription -subscriptionID $destSubId
+                }
                 #get the destination function app appsettings
-                $dresource = get-FunctionAppSettings -resourceGroupName $destinationResourceGroup -functionAppName $dfunctionapp
-            
-                $dresource = add-PropertiesToFunctionApp -destFunction $dresource -propertiestoAdd $properties
+                $dproperties= get-FunctionAppSettings -resourceGroupName $destinationResourceGroup -functionAppName $dfunctionapp
+                $dproperties = add-PropertiesToFunctionApp -destFunction $dproperties -propertiestoAdd $sproperties
 
                 #insert all of the appsettings into the destination function
-                update-FunctionAppSettings -destinationRG $destRG -functionAppName $dfunctionapp -updatedSettings $dresource.Properties
+                update-FunctionAppSettings -destinationRG $destRG -functionAppName $dfunctionapp -updatedSettings $dproperties
+
+                if($destSubId -ne "")
+                {
+                    set-Subscription -subscriptionID $subID
+                }
             }
         }
     }
@@ -184,19 +201,37 @@ Function copy-MultipleFunctionAppsWithSeparator
 # Function App Setting Copy Start
 echo "-------------------------------"
 echo "Setting Subscription: $($subID)"
-set-Subscription -subscriptionID $subID;
+set-Subscription -subscriptionID $subID
 
 #If the -multiple tag is specified, copy multiple function apps.
 if($args[0] -eq "-multiple")
 {
+    if($destSubId -ne "")
+    {
+        echo "Destination Subscription: $($destSubId)"
+    }
     echo "Copying Multiple Function Apps appsettings."
     echo "Source: $($sourceRG)"
+    echo "Destination: $($destRG)"
     $sourceFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $sourceRG;
     echo "Source Function App Names: $($sourceFunctionAppNames)"
+
+    if($destSubId -ne "")
+    {
+        set-Subscription -subscriptionID $destSubId
+    }
+
     $destFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $destRG;
     echo "Destination Function App Names: $($destFunctionAppNames)"
 
+    if($destSubId -ne "")
+    {
+        set-Subscription -subscriptionID $subID
+    }
+
     copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames -sourceResourceGroup $sourceRG -destinationResourceGroup $destRG
+    
+    echo "Copy Complete!"
 }
 #we haven't implemented this yet
 elseif($args[0] -eq "-single")
@@ -204,7 +239,7 @@ elseif($args[0] -eq "-single")
     echo "Currently copying one single function has not been implemented yet."
     echo "Usage: "
     echo "./CPAzureFunctionAppSettings -(single|multiple)"
-    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
+    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" [-destSubID `"<destination_subscription_id>`"] -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
     echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
     echo "`n"
     exit 1
