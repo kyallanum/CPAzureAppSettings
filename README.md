@@ -9,8 +9,10 @@ Usage:
 
 In the event that you have to copy app settings from one Azure Function to another, you may want to look into doing this with automation. Especially if you want to do this on a large scale.
 
+### V1.0.0
 The first iteration of this Github project takes all appsettings in an Azure Function in a resource group with the Function App Name taking the form of: *"MyFunctionName-othertext"* and copies them to existing azure functions of the same form in a different resource group, given that the *"othertext"* is unknown in both of them, and it has a *"-"* separation in the name. If you want to override the separator you can use the optional argument *"-separator <separator>"*.
 
+### V1.1.0
 The second iteration of this script included the ability to copy between subscriptions. To do this, the optional argument was implemented called -destSubID which is used the same way as -subID
 
 To use this script you either need the Azure CLI which can be found [here](https://github.com/Azure/azure-cli/releases), or you can use the cloud shell in your Azure Portal, which automatically had the Azure CLI installed.
