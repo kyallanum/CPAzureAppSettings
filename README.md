@@ -15,10 +15,10 @@ The second iteration of this script included the ability to copy between subscri
 
 To use this script you either need the Azure CLI which can be found [here](https://github.com/Azure/azure-cli/releases), or you can use the cloud shell in your Azure Portal, which automatically had the Azure CLI installed.
 
-###BUG FIX:
+### BUG FIX:
 Previously a combination of both the AzureRM Module was used as well as the Azure CLI. this caused some issues when attempting to change subscriptions and get information from both sides. To fix this I removed all AzureRM Module references and am just sticking with the Azure CLI. I knew that I was mixing the two, and planned on fixing everything, this just forced me to fix it earlier than normal.
 
-###QUICK NOTE:
+### QUICK NOTE:
 The propertiesToRemove variable in the remove-Properties functions specifies all of the Azure generated appsettings so that we can make sure the copy doesn't actually change the behavior of the function app.
 
 --------------
