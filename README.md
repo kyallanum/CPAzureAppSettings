@@ -15,7 +15,7 @@ The first iteration of this Github project takes all appsettings in an Azure Fun
 ### V1.1.0
 The second iteration of this script included the ability to copy between subscriptions. To do this, the optional argument was implemented called -destSubID which is used the same way as -subID
 
-To use this script you either need the Azure CLI which can be found [here](https://github.com/Azure/azure-cli/releases), or you can use the cloud shell in your Azure Portal, which automatically had the Azure CLI installed.
+To use this script you either need the Azure CLI which can be found [here](https://github.com/Azure/azure-cli/releases), or you can use the cloud shell in your Azure Portal, which automatically has the Azure CLI installed.
 
 ### BUG FIX:
 Previously a combination of both the AzureRM Module was used as well as the Azure CLI. this caused some issues when attempting to change subscriptions and get information from both sides. To fix this I removed all AzureRM Module references and am just sticking with the Azure CLI. I knew that I was mixing the two, and planned on fixing everything, this just forced me to fix it earlier than normal.
@@ -25,4 +25,4 @@ The propertiesToRemove variable in the remove-Properties functions specifies all
 
 --------------
 
-At this point this is all that I have implemented. But I will be working to implement other features into this script to allow other forms of copying including just copying a single function apps appsettings, as well as copying across subscriptions.
+At this point this is all that I have implemented. But I will be working to implement other features into this script to allow other forms of copying including just copying a single function apps appsettings.
