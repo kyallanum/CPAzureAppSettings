@@ -26,7 +26,7 @@ Function Output-Help
     Write-Host "                             -sourceRG `"<source_resource_group>`""
     Write-Host "                             [-destRG `"<destination_resource_group>`"]"
     Write-Host "                             -sourceFunc `"<source_function>`""
-    Write-Host "                             -destfunc `"<dest_func`""
+    Write-Host "                             -destfunc `"<dest_func>`""
     Write-Host "`n"
     Write-Host "./CPAzureFunctionAppSettings -multiple "
     Write-Host "                             [-separator `"<separator>`"]"
