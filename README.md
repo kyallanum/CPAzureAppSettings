@@ -1,7 +1,7 @@
 # Copying your Azure Functions' App Settings to another Function App.
 
 ```
-"Usage: 
+Usage: 
 ./CPAzureFunctionAppSettings -(single|multiple)
 ./CPAzureFunctionAppSettings -single
                              -subID "<source_sub_id>"
