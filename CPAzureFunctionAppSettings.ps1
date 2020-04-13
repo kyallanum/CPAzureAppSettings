@@ -4,44 +4,37 @@ param(
     [string]$destSubId = "",
     [string]$sourceRG = "",
     [string]$destRG = "",
-    [string]$separator = "-"
+    [string]$separator = "-",
+    [string]$sourceFunc = "",
+    [string]$destFunc = ""
 )
+#####################################################################
+#Declare all of our functions to be used.
 
-#If the user needs help with syntax show them here
-if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
-{
 
-    echo "Usage: "
-    echo "./CPAzureFunctionAppSettings -(single|multiple)"
-    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" [-destSubID `"<destination_subscription_id>`"] -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
-    echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
-    echo "`n"
-    exit 1
-}
-
-#Require that the user specify whether they want to copy a singular function app, or multiple.
-if ($args[0] -ne "-single" -and $args[0] -ne "-multiple")
+#Function: Output-Help
+#Purpose: Print out to the user the syntax for the script
+#Variables Taken: Nothing
+#Returns: Nothing
+Function Output-Help
 {
-    echo "Usage: "
-    echo "./CPAzureFunctionAppSettings -(single|multiple)"
-    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" [-destSubID `"<destination_subscription_id>`"] -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
-    echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
-    echo "`n"
-    exit 1
-}
-
-#If any required information is missing, get that from the user.
-if ($subID -eq "")
-{
-    $subID = Read-Host -Prompt "Subscription ID"
-}
-if ($sourceRG -eq "")
-{
-    $sourceRG = Read-Host -Prompt "Source Resource Group Name"
-}
-if ($destRG -eq "")
-{
-    $destRG = Read-Host -Prompt "Destination Resource Group Name"
+    Write-Host "Usage: "
+    Write-Host "./CPAzureFunctionAppSettings -(single|multiple)"
+    Write-Host "./CPAzureFunctionAppSettings -single"
+    Write-Host "                             -subID `"<source_sub_id>`""
+    Write-Host "                             [-destSubID `"<dest_sub_id>`"]"
+    Write-Host "                             -sourceRG `"<source_resource_group>`""
+    Write-Host "                             [-destRG `"<destination_resource_group>`"]"
+    Write-Host "                             -sourceFunc `"<source_function>`""
+    Write-Host "                             -destfunc `"<dest_func`""
+    Write-Host "`n"
+    Write-Host "./CPAzureFunctionAppSettings -multiple "
+    Write-Host "                             [-separator `"<separator>`"]"
+    Write-Host "                             -subID `"<subscriptionid>`""
+    Write-Host "                             [-destSubID `"<destination_subscription_id>`"]"
+    Write-Host "                             -sourceRg `"<source_resource_group>`""
+    Write-Host "                             -destRG `"<destination_resource_group>`""
+    Write-Host "`n"
 }
 
 #Function: set-Subscription
@@ -51,7 +44,13 @@ if ($destRG -eq "")
 Function set-Subscription
 {
     param([string]$subscriptionID)
-    az account set --subscription $subscriptionID
+    
+    az account set --subscription $subscriptionID 2> $null
+    if(($(az account show --query "{ID: id}" | ConvertFrom-Json ).ID) -ne $subscriptionID)
+    {
+        Write-Host "Error: Could not connect to provided subscription" -ForegroundColor Yellow
+        exit 1
+    } 
 }
 
 #Function: get-MultipleFunctionAppNames
@@ -63,7 +62,11 @@ Function get-MultipleFunctionAppNames
     param([string]$resourceGroupName)
     
     #Get the source Function App Names
-    $functionappIDs = @($(az functionapp list -g $resourceGroupName --query "[].{ID: id}" | ConvertFrom-Json).ID)
+    if(!($functionappIDs = @($(az functionapp list -g $resourceGroupName --query "[].{ID: id}" | ConvertFrom-Json).ID)))
+    {
+        Write-Host "ERROR: No Azure Funcitons in this Resource Group" -ForegroundColor Yellow
+        exit 1
+    }
     $functionAppNames = @(foreach ($item in $functionAppIDs) {$item.Split("/")[-1];})
     , $functionAppNames
 }
@@ -187,7 +190,7 @@ Function copy-MultipleFunctionAppsWithSeparator
                 $dproperties = add-PropertiesToFunctionApp -destFunction $dproperties -propertiestoAdd $sproperties
 
                 #insert all of the appsettings into the destination function
-                update-FunctionAppSettings -destinationRG $destRG -functionAppName $dfunctionapp -updatedSettings $dproperties
+                
 
                 if($destSubId -ne "")
                 {
@@ -198,23 +201,20 @@ Function copy-MultipleFunctionAppsWithSeparator
     }
 }
 
-# Function App Setting Copy Start
-echo "-------------------------------"
-echo "Setting Subscription: $($subID)"
-set-Subscription -subscriptionID $subID
-
-#If the -multiple tag is specified, copy multiple function apps.
-if($args[0] -eq "-multiple")
+Function copyMultiple
 {
+    Write-Host "Setting Subscription: $($subID)"
+    set-Subscription -subscriptionID $subID
+
     if($destSubId -ne "")
     {
-        echo "Destination Subscription: $($destSubId)"
+        Write-Host "Destination Subscription: $($destSubId)"
     }
-    echo "Copying Multiple Function Apps appsettings."
-    echo "Source: $($sourceRG)"
-    echo "Destination: $($destRG)"
+    Write-Host "Copying Multiple Function Apps appsettings."
+    Write-Host "Source: $($sourceRG)"
+    Write-Host "Destination: $($destRG)"
     $sourceFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $sourceRG;
-    echo "Source Function App Names: $($sourceFunctionAppNames)"
+    Write-Host "Source Function App Names: $($sourceFunctionAppNames)"
 
     if($destSubId -ne "")
     {
@@ -222,7 +222,7 @@ if($args[0] -eq "-multiple")
     }
 
     $destFunctionAppNames = get-MultipleFunctionAppNames -resourceGroupName $destRG;
-    echo "Destination Function App Names: $($destFunctionAppNames)"
+    Write-Host "Destination Function App Names: $($destFunctionAppNames)"
 
     if($destSubId -ne "")
     {
@@ -231,16 +231,140 @@ if($args[0] -eq "-multiple")
 
     copy-MultipleFunctionAppsWithSeparator -sfunctionAppNames $sourceFunctionAppNames -dfunctionAppNames $destFunctionAppNames -sourceResourceGroup $sourceRG -destinationResourceGroup $destRG
     
-    echo "Copy Complete!"
+    Write-Host "Copy Complete!"
 }
-#we haven't implemented this yet
-elseif($args[0] -eq "-single")
+
+Function copySingle
 {
-    echo "Currently copying one single function has not been implemented yet."
-    echo "Usage: "
-    echo "./CPAzureFunctionAppSettings -(single|multiple)"
-    echo "./CPAzureFunctionAppSettings -multiple [-separator `"<separator>`"] -subID `"<subscriptionid>`" [-destSubID `"<destination_subscription_id>`"] -sourceRg `"<source_resource_group>`" -destRG `"<destination_resource_group>`""
-    echo "./CPAzureFunctionAppSettings -single <--------- not implemented yet"
-    echo "`n"
+    #Validate Information. Throw errors if source Subscription, Resource Groups, or Functions dont exist.
+    Write-Host "Source Subscription ID: $($subID)"
+    set-Subscription -subscriptionID $subID
+
+    if($destSubId -ne "")
+    {
+        Write-Host "Destination Subscription ID: $($destSubId)"
+    }
+
+    Write-Host "Source Resource Group: $($sourceRG)"
+    if(!([System.Convert]::ToBoolean($(az group exists -n $sourceRG 2> $null))))
+    {
+        Write-Host "ERROR: The source resource group does not exist" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $destRG = if($destRG -eq "") { $sourceRG } else { $destRG }
+    if($destRG -ne "")
+    {
+        Write-Host "Destination Resource Group: $($destRG)"
+    }
+
+    Write-Host "Source Function App: $($sourceFunc)"
+    if(!(($(az functionapp list -g $sourceRG --query "[].{Name: name}" | ConvertFrom-Json ).Name ) -eq $sourceFunc))
+    {
+        Write-Host "ERROR: The source function app does not exist" -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Host "Destination Function App: $($destFunc)"
+
+    Write-Host "--------------------------------------"
+    Write-Host "Getting Source App Settings"
+    $sAppSettings = get-FunctionAppSettings -resourceGroupName $sourceRG -functionAppName $sourceFunc
+    $sAppSettings = remove-Properties -properties $sAppSettings
+
+    Write-Host "--------------------------------------"
+    Write-Host "Getting Destination App Settings"
+
+    #Run Checks on whether destination resources exist.
+    if($destSubId -ne "")
+    {
+        set-Subscription -subscriptionID $destSubId
+    }
+
+
+    if(!([System.Convert]::ToBoolean($(az group exists -n $destRG 2> $null))))
+    {
+        Write-Host "ERROR: The destination resource group does not exist" -ForegroundColor Yellow
+        exit 1
+    }
+    if(!(($(az functionapp list -g $destRG --query "[].{Name: name}" | ConvertFrom-Json ).Name ) -eq $destFunc))
+    {
+        Write-Host "ERROR: The destination function app does not exist" -ForegroundColor Yellow
+        exit 1
+    }
+
+    $dAppSettings = get-FunctionAppSettings -resourceGroupName $destRG -functionAppName $destFunc
+    $dAppSettings = add-PropertiesToFunctionApp -destFunction $dAppSettings -propertiestoAdd $sAppSettings
+
+    update-FunctionAppSettings -destinationRG $destRG -functionAppName $destFunc -updatedSettings $dAppSettings
+
+    Write-Host "Copy Complete!"
+}
+
+
+
+########################################################################
+#Script Execution Start
+
+#Handle All Arguments
+#If the user needs help with syntax show them here
+if ($args[0] -eq "/?" -or $args[0] -eq "-help" -or $args[0] -eq "--help")
+{
+    Output-Help
     exit 1
+}
+
+switch ( $args[0] )
+{
+    "-single"
+    {
+        if($subID -eq "")
+        {
+            Read-Host -Prompt "Source Subscription"
+        }
+        if($sourceRG -eq "")
+        {
+            Read-Host -Prompt "Source Resource Group"
+        }
+        if($sourceFunc -eq "")
+        {
+            Read-Host -Prompt "Source Function App"
+        }
+        if($destFunc -eq "")
+        {
+            Read-Host -Prompt "Destination Function App"
+        }
+        copySingle
+
+        break
+    }
+    "-multiple"
+    {
+        if($subID -eq "")
+        {
+            Read-Host -Prompt "Source Subscription"
+        }
+        if($sourceRG -eq "")
+        {
+            Read-Host -Prompt "Source Resource Group"
+        }
+        if($destRG -eq "")
+        {
+            Read-Host -Prompt "Destination Resource Group"
+        }
+
+        copyMultiple
+
+        break
+    }
+    {($_ -eq "/?") -or ($_ -eq "-help") -or ($_ -eq "--help")}
+    {
+        Output-Help
+        exit -1
+    }
+    default
+    {
+        Output-Help
+        exit 1
+    }
 }
