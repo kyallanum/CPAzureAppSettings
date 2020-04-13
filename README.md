@@ -9,6 +9,11 @@ Usage:
 
 In the event that you have to copy app settings from one Azure Function to another, you may want to look into doing this with automation. Especially if you want to do this on a large scale.
 
+### REQUIREMENTS
+[PowerShell Version 7.0](https://github.com/PowerShell/PowerShell/releases/tag/v7.0.0-preview.6)
+The [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
+
+
 ### V1.0.0
 The first iteration of this Github project takes all appsettings in an Azure Function in a resource group with the Function App Name taking the form of: *"MyFunctionName-othertext"* and copies them to existing azure functions of the same form in a different resource group, given that the *"othertext"* is unknown in both of them, and it has a *"-"* separation in the name. If you want to override the separator you can use the optional argument *"-separator <separator>"*.
 
