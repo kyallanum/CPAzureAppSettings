@@ -11,6 +11,7 @@ In the event that you have to copy app settings from one Azure Function to anoth
 
 ### REQUIREMENTS
 [PowerShell Version 7.0](https://github.com/PowerShell/PowerShell/releases/tag/v7.0.0-preview.6) 
+
 The [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 
 
