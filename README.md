@@ -10,7 +10,7 @@ Usage:
 In the event that you have to copy app settings from one Azure Function to another, you may want to look into doing this with automation. Especially if you want to do this on a large scale.
 
 ### REQUIREMENTS
-[PowerShell Version 7.0](https://github.com/PowerShell/PowerShell/releases/tag/v7.0.0-preview.6)
+[PowerShell Version 7.0](https://github.com/PowerShell/PowerShell/releases/tag/v7.0.0-preview.6) 
 The [Azure CLI](https://docs.microsoft.com/en-us/cli/azure/install-azure-cli?view=azure-cli-latest)
 
 
