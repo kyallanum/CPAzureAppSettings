@@ -1,10 +1,22 @@
 # Copying your Azure Functions' App Settings to another Function App.
 
 ```
-Usage: 
+"Usage: 
 ./CPAzureFunctionAppSettings -(single|multiple)
-./CPAzureFunctionAppSettings -multiple [-separator "<separator>"] -subID "<subscriptionid>" [-destSubID "<destination_subscription_id>"] -sourceRg "<source_resource_group>" -destRG "<destination_resource_group>"
-./CPAzureFunctionAppSettings -single <--------- not implemented yet
+./CPAzureFunctionAppSettings -single
+                             -subID "<source_sub_id>"
+                             [-destSubID "<dest_sub_id>"]
+                             -sourceRG "<source_resource_group>"
+                             [-destRG "<destination_resource_group>"]
+                             -sourceFunc "<source_function>"
+                             -destfunc "<dest_func>"
+
+./CPAzureFunctionAppSettings -multiple
+                             [-separator "<separator>"]
+                             -subID "<subscriptionid>"
+                             [-destSubID "<destination_subscription_id>"]
+                             -sourceRg "<source_resource_group>"
+                             -destRG "<destination_resource_group>"
 ```
 
 In the event that you have to copy app settings from one Azure Function to another, you may want to look into doing this with automation. Especially if you want to do this on a large scale.
